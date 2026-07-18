@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: clouddelivery-jenkins-local
+    restart: unless-stopped
+    ports:
+      - "8090:8080"       # Jenkins UI  → http://localhost:8090
+      - "50000:50000"     # Agent port
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./casc:/var/jenkins_casc:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - .env
+    environment:
+      CASC_JENKINS_CONFIG: /var/jenkins_casc
+
+volumes:
+  jenkins_home:

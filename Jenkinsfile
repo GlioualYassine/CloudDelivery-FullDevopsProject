@@ -1,11 +1,15 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'Maven-3.9'
+    }
+
     environment {
-        DOCKERHUB_USERNAME = credentials('dockerhub-username-env')
+        DOCKERHUB_USERNAME = credentials('dockerhub-credentials')
         DOCKER_IMAGE_PREFIX = "${DOCKERHUB_USERNAME}/clouddelivery"
         IMAGE_TAG = "${env.GIT_COMMIT[0..6]}"
-        APP_SERVER_IP = "${env.APP_SERVER_IP}"
+        APP_SERVER_IP = "${env.APP_SERVER_IP ?: ''}"
         SOURCE_DIR = "Source Code"
     }
 

@@ -1,0 +1,46 @@
+jenkins:
+  systemMessage: "CloudDelivery CI/CD — Local Jenkins"
+  numExecutors: 2
+  mode: NORMAL
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: "${JENKINS_ADMIN_PASSWORD}"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: dockerhub-credentials
+              username: "${DOCKERHUB_USERNAME}"
+              password: "${DOCKERHUB_TOKEN}"
+              description: "Docker Hub — username + token"
+
+unclassified:
+  location:
+    url: "http://localhost:8090/"
+    adminAddress: "yassineag1011@gmail.com"
+
+tool:
+  git:
+    installations:
+      - name: Default
+        home: git
+
+  maven:
+    installations:
+      - name: Maven-3.9
+        properties:
+          - installSource:
+              installers:
+                - maven:
+                    id: "3.9.6"
