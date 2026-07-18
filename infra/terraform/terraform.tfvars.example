@@ -1,0 +1,17 @@
+# Copy this file to terraform.tfvars and fill in your values
+# terraform.tfvars is git-ignored — never commit secrets
+
+aws_region        = "eu-west-3"
+availability_zone = "eu-west-3a"
+
+# Name of the Key Pair created in the AWS Console (EC2 → Key Pairs)
+key_name = "clouddelivery-key"
+
+# Your public IP: curl -s https://checkip.amazonaws.com
+your_ip_cidr = "0.0.0.0/32"
+
+instance_type_jenkins = "t3.medium"
+instance_type_app     = "t3.medium"
+
+project_name = "clouddelivery"
+environment  = "staging"

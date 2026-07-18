@@ -1,0 +1,69 @@
+---
+- name: Create Jenkins directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: 1000
+    group: 1000
+    mode: "0755"
+  loop:
+    - "{{ jenkins_home }}"
+    - "{{ jenkins_home }}/init.groovy.d"
+    - /opt/jenkins/casc
+
+- name: Deploy Jenkins Configuration as Code (JCasC)
+  template:
+    src: jenkins.yaml.j2
+    dest: /opt/jenkins/casc/jenkins.yaml
+    mode: "0644"
+
+- name: Deploy Jenkins Docker container
+  docker_container:
+    name: jenkins
+    image: "{{ jenkins_image }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "{{ jenkins_port }}:8080"
+      - "{{ jenkins_agent_port }}:50000"
+    volumes:
+      - "{{ jenkins_home }}:/var/jenkins_home"
+      - /opt/jenkins/casc:/var/jenkins_casc
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/local/bin/docker-compose:/usr/local/bin/docker-compose
+    env:
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false -Xmx1g"
+      CASC_JENKINS_CONFIG: "/var/jenkins_casc/jenkins.yaml"
+    user: "root"
+
+- name: Wait for Jenkins to start
+  uri:
+    url: "http://localhost:{{ jenkins_port }}/login"
+    status_code: 200
+    timeout: 10
+  register: jenkins_up
+  until: jenkins_up.status == 200
+  retries: 30
+  delay: 10
+
+- name: Install Jenkins plugins
+  command: >
+    docker exec jenkins
+    jenkins-plugin-cli --plugins "{{ jenkins_plugins | join(' ') }}"
+  notify: Restart Jenkins
+
+- name: Copy SSH deploy key to Jenkins home
+  copy:
+    src: "~/.ssh/clouddelivery-key.pem"
+    dest: "{{ jenkins_home }}/deploy-key.pem"
+    owner: 1000
+    group: 1000
+    mode: "0600"
+  ignore_errors: yes
+
+handlers:
+  - name: Restart Jenkins
+    docker_container:
+      name: jenkins
+      state: started
+      restart: yes

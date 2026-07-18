@@ -1,0 +1,42 @@
+---
+- name: Provision Jenkins server
+  hosts: jenkins
+  become: yes
+  gather_facts: yes
+  roles:
+    - common
+    - docker
+    - jenkins
+
+- name: Provision App server
+  hosts: app
+  become: yes
+  gather_facts: yes
+  roles:
+    - common
+    - docker
+  tasks:
+    - name: Create application directory
+      file:
+        path: "{{ app_compose_dir }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Clone CloudDelivery repository
+      git:
+        repo: "{{ app_repo_url }}"
+        dest: "{{ app_compose_dir }}"
+        version: "{{ app_repo_branch }}"
+        force: yes
+      become_user: ubuntu
+
+    - name: Copy .env file for production
+      template:
+        src: "{{ playbook_dir }}/templates/app.env.j2"
+        dest: "{{ app_compose_dir }}/.env"
+        owner: ubuntu
+        group: ubuntu
+        mode: "0600"
+      ignore_errors: yes
