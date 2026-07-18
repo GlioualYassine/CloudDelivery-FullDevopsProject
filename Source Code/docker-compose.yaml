@@ -222,6 +222,39 @@ services:
     networks:
       - clouddelivery-net
 
+  # =========================
+  # API Gateway
+  # =========================
+  api-gateway:
+    build:
+      context: ./api-gateway
+    container_name: clouddelivery-gateway
+    restart: unless-stopped
+    depends_on:
+      authentication-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      delivery-service:
+        condition: service_healthy
+    environment:
+      AUTHENTICATION_SERVICE_URL: http://authentication-service:8081
+      NOTIFICATION_SERVICE_URL: http://notification-service:8082
+      ORDER_SERVICE_URL: http://order-service:8083
+      DELIVERY_SERVICE_URL: http://delivery-service:8084
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clouddelivery-net
+
 networks:
   clouddelivery-net:
     driver: bridge
