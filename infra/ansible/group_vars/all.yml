@@ -1,0 +1,32 @@
+---
+# Docker
+docker_version: "26.1"
+docker_compose_version: "2.27.0"
+
+# Jenkins
+jenkins_image: "jenkins/jenkins:lts-jdk17"
+jenkins_port: 8080
+jenkins_agent_port: 50000
+jenkins_home: /opt/jenkins/home
+
+# Docker Hub
+dockerhub_username: "{{ lookup('env', 'DOCKERHUB_USERNAME') }}"
+
+# Application
+app_compose_dir: /opt/clouddelivery
+app_repo_url: "https://github.com/GlioualYassine/CloudDelivery-FullDevopsProject.git"
+app_repo_branch: "develop"
+
+# Jenkins plugins to install
+jenkins_plugins:
+  - git
+  - workflow-aggregator
+  - pipeline-stage-view
+  - docker-workflow
+  - docker-plugin
+  - credentials-binding
+  - blueocean
+  - github
+  - ssh-agent
+  - antisamy-markup-formatter
+  - configuration-as-code

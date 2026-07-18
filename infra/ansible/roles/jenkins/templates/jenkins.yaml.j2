@@ -1,0 +1,78 @@
+---
+jenkins:
+  systemMessage: "CloudDelivery CI/CD — configured by Ansible JCasC"
+  numExecutors: 2
+  mode: NORMAL
+  quietPeriod: 5
+  scmCheckoutRetryCount: 2
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: "${JENKINS_ADMIN_PASSWORD}"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: DOCKERHUB_USERNAME
+            value: "{{ dockerhub_username }}"
+          - key: APP_SERVER_IP
+            value: "{{ hostvars[groups['app'][0]]['ansible_host'] }}"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: dockerhub-credentials
+              username: "${DOCKERHUB_USERNAME}"
+              password: "${DOCKERHUB_TOKEN}"
+              description: "Docker Hub credentials"
+          - string:
+              scope: GLOBAL
+              id: mail-username
+              secret: "${MAIL_USERNAME}"
+              description: "SMTP mail username"
+          - string:
+              scope: GLOBAL
+              id: mail-password
+              secret: "${MAIL_PASSWORD}"
+              description: "SMTP mail password"
+          - basicSSHUserPrivateKey:
+              scope: GLOBAL
+              id: app-server-ssh
+              username: ubuntu
+              privateKeySource:
+                directEntry:
+                  privateKey: "${APP_SERVER_SSH_KEY}"
+              description: "SSH key for App server deployment"
+
+unclassified:
+  location:
+    url: "http://{{ hostvars[groups['jenkins'][0]]['ansible_host'] }}:{{ jenkins_port }}/"
+    adminAddress: "yassineag1011@gmail.com"
+
+  gitHubPluginConfig:
+    hookUrl: "http://{{ hostvars[groups['jenkins'][0]]['ansible_host'] }}:{{ jenkins_port }}/github-webhook/"
+
+tool:
+  git:
+    installations:
+      - name: Default
+        home: git
+
+  maven:
+    installations:
+      - name: Maven-3.9
+        properties:
+          - installSource:
+              installers:
+                - maven:
+                    id: "3.9.6"

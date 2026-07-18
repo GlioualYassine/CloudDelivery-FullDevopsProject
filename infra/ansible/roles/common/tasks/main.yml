@@ -1,0 +1,62 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install system packages
+  apt:
+    name:
+      - curl
+      - wget
+      - unzip
+      - git
+      - jq
+      - htop
+      - net-tools
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - apt-transport-https
+      - software-properties-common
+    state: present
+
+- name: Set timezone to UTC
+  timezone:
+    name: UTC
+
+- name: Configure sysctl for production
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: vm.swappiness,              value: "10" }
+    - { name: net.core.somaxconn,         value: "65535" }
+    - { name: net.ipv4.tcp_max_syn_backlog, value: "65535" }
+
+- name: Create swap file (2GB)
+  command: fallocate -l 2G /swapfile
+  args:
+    creates: /swapfile
+
+- name: Set swap permissions
+  file:
+    path: /swapfile
+    mode: "0600"
+
+- name: Format swap
+  command: mkswap /swapfile
+  args:
+    creates: /swapfile
+
+- name: Enable swap
+  command: swapon /swapfile
+  ignore_errors: yes
+
+- name: Persist swap in fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "/swapfile none swap sw 0 0"
+    state: present

@@ -1,0 +1,246 @@
+version: "3.9"
+
+# Production docker-compose — uses pre-built Docker Hub images
+# Set IMAGE_TAG and DOCKERHUB_USERNAME before running
+# Required env vars: MAIL_USERNAME, MAIL_PASSWORD
+
+services:
+  # =========================
+  # PostgreSQL
+  # =========================
+  postgres:
+    image: postgres:15
+    container_name: clouddelivery-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cld_user
+      POSTGRES_PASSWORD: cld_password
+      POSTGRES_DB: cld_main_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cld_user -d cld_main_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # MongoDB
+  # =========================
+  mongodb:
+    image: mongo:6.0
+    container_name: clouddelivery-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo_root
+      MONGO_INITDB_ROOT_PASSWORD: mongo_password
+      MONGO_INITDB_DATABASE: auth_db
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --eval \"db.adminCommand('ping').ok\" --quiet | grep 1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Zookeeper
+  # =========================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: clouddelivery-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    healthcheck:
+      test: echo ruok | nc -w 2 localhost 2181 | grep imok
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Kafka (internal-only listener in production)
+  # =========================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: clouddelivery-kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9093", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Authentication Service
+  # =========================
+  authentication-service:
+    image: ${DOCKERHUB_USERNAME}-auth:${IMAGE_TAG:-latest}
+    container_name: clouddelivery-auth
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo_root:mongo_password@mongodb:27017/auth_db?authSource=admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Notification Service
+  # =========================
+  notification-service:
+    image: ${DOCKERHUB_USERNAME}-notification:${IMAGE_TAG:-latest}
+    container_name: clouddelivery-notification
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo_root:mongo_password@mongodb:27017/notification_db?authSource=admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Order Service
+  # =========================
+  order-service:
+    image: ${DOCKERHUB_USERNAME}-order:${IMAGE_TAG:-latest}
+    container_name: clouddelivery-order
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cld_main_db
+      SPRING_DATASOURCE_USERNAME: cld_user
+      SPRING_DATASOURCE_PASSWORD: cld_password
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Delivery Service
+  # =========================
+  delivery-service:
+    image: ${DOCKERHUB_USERNAME}-delivery:${IMAGE_TAG:-latest}
+    container_name: clouddelivery-delivery
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cld_main_db
+      SPRING_DATASOURCE_USERNAME: cld_user
+      SPRING_DATASOURCE_PASSWORD: cld_password
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8084/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # API Gateway
+  # =========================
+  api-gateway:
+    image: ${DOCKERHUB_USERNAME}-gateway:${IMAGE_TAG:-latest}
+    container_name: clouddelivery-gateway
+    restart: unless-stopped
+    depends_on:
+      authentication-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      delivery-service:
+        condition: service_healthy
+    environment:
+      AUTHENTICATION_SERVICE_URL: http://authentication-service:8081
+      NOTIFICATION_SERVICE_URL: http://notification-service:8082
+      ORDER_SERVICE_URL: http://order-service:8083
+      DELIVERY_SERVICE_URL: http://delivery-service:8084
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clouddelivery-net
+
+networks:
+  clouddelivery-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongo_data:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
