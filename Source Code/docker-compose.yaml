@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   # =========================
-  # PostgreSQL (Orders / Deliveries / Payments)
+  # PostgreSQL (Orders / Deliveries)
   # =========================
   postgres:
     image: postgres:15
@@ -11,11 +11,17 @@ services:
     environment:
       POSTGRES_USER: cld_user
       POSTGRES_PASSWORD: cld_password
-      POSTGRES_DB: cld_main_db   # DB par défaut ; tu peux en créer d'autres via migrations
+      POSTGRES_DB: cld_main_db
     ports:
-      - "5432:5432"              # accès depuis IntelliJ
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cld_user -d cld_main_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - clouddelivery-net
 
@@ -31,9 +37,15 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: mongo_password
       MONGO_INITDB_DATABASE: auth_db
     ports:
-      - "27017:27017"            # accès depuis IntelliJ
+      - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --eval \"db.adminCommand('ping').ok\" --quiet | grep 1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - clouddelivery-net
 
@@ -64,6 +76,9 @@ services:
 
   # =========================
   # Kafka
+  # Two listeners:
+  #   PLAINTEXT_INTERNAL://kafka:9093  — container-to-container
+  #   PLAINTEXT_EXTERNAL://localhost:9092 — host machine (IntelliJ / CLI)
   # =========================
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -73,21 +88,137 @@ services:
       zookeeper:
         condition: service_healthy
     ports:
-      - "9092:9092"   # accès depuis ta machine: localhost:9092
+      - "9092:9092"
     volumes:
       - kafka_data:/var/lib/kafka/data
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-
-      # Listener unique pour dev : accessible sur localhost:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-      # Un seul broker → facteur de réplication = 1
+      KAFKA_LISTENERS: PLAINTEXT_INTERNAL://0.0.0.0:9093,PLAINTEXT_EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_INTERNAL://kafka:9093,PLAINTEXT_EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT_INTERNAL:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Authentication Service
+  # =========================
+  authentication-service:
+    build:
+      context: ./authentication-service
+    container_name: clouddelivery-auth
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo_root:mongo_password@mongodb:27017/auth_db?authSource=admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Notification Service
+  # =========================
+  notification-service:
+    build:
+      context: ./notification-service
+    container_name: clouddelivery-notification
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo_root:mongo_password@mongodb:27017/notification_db?authSource=admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Order Service
+  # =========================
+  order-service:
+    build:
+      context: ./order-service
+    container_name: clouddelivery-order
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cld_main_db
+      SPRING_DATASOURCE_USERNAME: cld_user
+      SPRING_DATASOURCE_PASSWORD: cld_password
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clouddelivery-net
+
+  # =========================
+  # Delivery Service
+  # =========================
+  delivery-service:
+    build:
+      context: ./delivery-service
+    container_name: clouddelivery-delivery
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cld_main_db
+      SPRING_DATASOURCE_USERNAME: cld_user
+      SPRING_DATASOURCE_PASSWORD: cld_password
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+    ports:
+      - "8084:8084"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8084/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - clouddelivery-net
 
