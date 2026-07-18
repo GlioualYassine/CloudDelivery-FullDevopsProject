@@ -342,10 +342,14 @@ CloudDelivery-FullDevopsProject/
 
 ## Documentation
 
+Toute la documentation est dans le dossier [`docs/`](./docs/) :
+
 | Document | Description |
 |---|---|
-| [`INFRA-EXPLAINED.md`](./INFRA-EXPLAINED.md) | Guide complet Terraform & Ansible — concepts, exemples, fichier par fichier |
-| [`DEPLOYMENT.md`](./DEPLOYMENT.md) | Rapport architecture enterprise — sécurité, Kubernetes, Sealed Secrets |
+| [`docs/MISE-EN-PLACE.md`](./docs/MISE-EN-PLACE.md) | Guide complet d'installation et de lancement (local + AWS) |
+| [`docs/JENKINS-EXPLAINED.md`](./docs/JENKINS-EXPLAINED.md) | Jenkins expliqué de A à Z — CI/CD, Jenkinsfile, JCasC |
+| [`docs/INFRA-EXPLAINED.md`](./docs/INFRA-EXPLAINED.md) | Terraform & Ansible expliqués de A à Z — chaque fichier justifié |
+| [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) | Rapport architecture enterprise — sécurité, Kubernetes, Sealed Secrets |
 
 ---
 
