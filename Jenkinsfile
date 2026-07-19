@@ -196,9 +196,9 @@ pipeline {
         // ─────────────────────────────────────────────────────────────────────
         stage('Push to Docker Hub') {
             when {
-                anyOf {
-                    branch 'develop'
-                    branch 'main'
+                allOf {
+                    anyOf { branch 'develop'; branch 'main' }
+                    expression { return env.DOCKERHUB_USERNAME != null && env.DOCKERHUB_USERNAME != '' }
                 }
             }
             steps {
@@ -226,9 +226,9 @@ pipeline {
         // ─────────────────────────────────────────────────────────────────────
         stage('Deploy') {
             when {
-                anyOf {
-                    branch 'develop'
-                    branch 'main'
+                allOf {
+                    anyOf { branch 'develop'; branch 'main' }
+                    expression { return env.APP_SERVER_IP != null && env.APP_SERVER_IP != '' }
                 }
             }
             steps {
@@ -275,9 +275,9 @@ pipeline {
         // ─────────────────────────────────────────────────────────────────────
         stage('Smoke Test') {
             when {
-                anyOf {
-                    branch 'develop'
-                    branch 'main'
+                allOf {
+                    anyOf { branch 'develop'; branch 'main' }
+                    expression { return env.APP_SERVER_IP != null && env.APP_SERVER_IP != '' }
                 }
             }
             steps {
