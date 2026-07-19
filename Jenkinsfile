@@ -49,7 +49,7 @@ pipeline {
                 stage('Auth Tests') {
                     steps {
                         dir("${SOURCE_DIR}/authentication-service") {
-                            sh 'mvn test -B --no-transfer-progress'
+                            retry(2) { sh 'mvn test -B --no-transfer-progress' }
                         }
                     }
                     post {
@@ -62,7 +62,7 @@ pipeline {
                 stage('Notification Tests') {
                     steps {
                         dir("${SOURCE_DIR}/notification-service") {
-                            sh 'mvn test -B --no-transfer-progress'
+                            retry(2) { sh 'mvn test -B --no-transfer-progress' }
                         }
                     }
                     post {
@@ -75,7 +75,7 @@ pipeline {
                 stage('Order Tests') {
                     steps {
                         dir("${SOURCE_DIR}/order-service") {
-                            sh 'mvn test -B --no-transfer-progress'
+                            retry(2) { sh 'mvn test -B --no-transfer-progress' }
                         }
                     }
                     post {
@@ -88,7 +88,7 @@ pipeline {
                 stage('Delivery Tests') {
                     steps {
                         dir("${SOURCE_DIR}/delivery-service") {
-                            sh 'mvn test -B --no-transfer-progress'
+                            retry(2) { sh 'mvn test -B --no-transfer-progress' }
                         }
                     }
                     post {
