@@ -8,3 +8,5 @@ docker-plugin
 ssh-agent
 configuration-as-code
 antisamy-markup-formatter
+junit
+ws-cleanup
