@@ -20,6 +20,10 @@ RUN groupadd -f -g 999 docker && usermod -aG docker jenkins
 
 USER jenkins
 
+# Install plugins at build time so they are ready on first start
+COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
+RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
+
 # Disable setup wizard — JCasC handles configuration
 ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false -Xmx1g"
 ENV CASC_JENKINS_CONFIG=/var/jenkins_casc

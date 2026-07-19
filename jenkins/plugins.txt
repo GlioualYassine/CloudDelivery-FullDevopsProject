@@ -1,0 +1,10 @@
+workflow-aggregator
+pipeline-stage-view
+git
+github
+credentials-binding
+docker-workflow
+docker-plugin
+ssh-agent
+configuration-as-code
+antisamy-markup-formatter
