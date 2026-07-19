@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.0</version>
+        <version>4.0.6</version>
         <relativePath/>
     </parent>
 
@@ -19,6 +19,9 @@
     <properties>
         <java.version>17</java.version>
         <spring-cloud.version>2024.0.0</spring-cloud.version>
+        <tomcat.version>11.0.22</tomcat.version>
+        <kafka.version>4.1.2</kafka.version>
+        <bouncycastle.version>1.80.2</bouncycastle.version>
     </properties>
 
     <dependencyManagement>
@@ -29,6 +32,11 @@
                 <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
