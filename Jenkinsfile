@@ -6,11 +6,12 @@ pipeline {
     }
 
     environment {
-        DOCKERHUB_USERNAME = credentials('dockerhub-credentials')
-        DOCKER_IMAGE_PREFIX = "${DOCKERHUB_USERNAME}/clouddelivery"
-        IMAGE_TAG = "${env.GIT_COMMIT[0..6]}"
-        APP_SERVER_IP = "${env.APP_SERVER_IP ?: ''}"
-        SOURCE_DIR = "Source Code"
+        DOCKERHUB_CREDS    = credentials('dockerhub-credentials')
+        IMAGE_TAG          = "${env.GIT_COMMIT[0..6]}"
+        APP_SERVER_IP      = "${env.APP_SERVER_IP ?: ''}"
+        SOURCE_DIR         = "Source Code"
+        // DOCKER_IMAGE_PREFIX is set in Checkout stage using DOCKERHUB_CREDS_USR
+        // (credentials() in env block gives username:password — unusable as image prefix)
     }
 
     options {
@@ -33,7 +34,9 @@ pipeline {
                 checkout scm
                 script {
                     env.IMAGE_TAG = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    env.DOCKER_IMAGE_PREFIX = "${env.DOCKERHUB_CREDS_USR}/clouddelivery"
                     echo "Building commit: ${env.IMAGE_TAG} on branch: ${env.BRANCH_NAME}"
+                    echo "Image prefix: ${env.DOCKER_IMAGE_PREFIX}"
                 }
             }
         }
@@ -197,7 +200,7 @@ pipeline {
             when {
                 allOf {
                     anyOf { branch 'develop'; branch 'main' }
-                    expression { return env.DOCKERHUB_USERNAME != null && env.DOCKERHUB_USERNAME != '' }
+                    expression { return env.DOCKERHUB_CREDS_USR != null && env.DOCKERHUB_CREDS_USR != '' }
                 }
             }
             steps {
